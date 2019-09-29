@@ -1,8 +1,9 @@
 import datetime
-
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 import time, sys
+
 
 class UpdateTime(QThread):
     time_show = pyqtSignal(str)
@@ -14,14 +15,31 @@ class UpdateTime(QThread):
             time.sleep(1)
 
 
-class LogWnd(QWidget):
-    def __init__(self):
-        QWidget.__init__(self)
+class UpdateSpend(QThread):
+    time_spend = pyqtSignal(str)
 
-        self.setGeometry(300, 300, 440, 350)
+    def run(self):
+        spend = 0
+        while 1:
+            spend += 1
+            d = int(spend/60/60/24)
+            h = int(spend/60/60)
+            m = int(spend/60)
+            s = spend%60
+            str1 = '{}天{}时{}分{}秒'.format(d, h, m, s)
+            self.time_spend.emit(str(str1))
+            time.sleep(1)
+
+
+class LogWnd(QWidget):
+    close_signal = pyqtSignal(str)
+
+    def __init__(self, content):
+        QWidget.__init__(self)
+        self.setFixedSize(440, 350)
         self.setWindowTitle('记录工作内容')
 
-        self.log_field = QTextEdit(self)
+        self.log_field = QTextEdit(content, self)
         self.log_field.setGeometry(20, 20, 300, 300)
 
         # layout
@@ -38,28 +56,104 @@ class LogWnd(QWidget):
         self.close()
 
 
-class Main(QWidget):
+class Main(QDialog):
+    _startPos = None
+    _endPos = None
+    _isTracking = False
+
     def __init__(self):
-        QWidget.__init__(self)
-
+        QDialog.__init__(self)
+        self.log_content = 'hello'
         self.setWindowTitle('字体设置')
-
+        self.setFixedSize(QSize(305, 80))
+        # border-image:url(img.jpg);
+        self.setStyleSheet(
+            '''
+            QFrame{
+                border:none;
+                color:white;
+                background:lightblue;
+                border:1px solid #F3F3F5;
+                border-radius:10px;
+                text-align:center;
+                }
+            QDialog{
+                background-color:lightgreen;
+                border-top:1px solid white;
+                border-bottom:1px solid white;
+                border-left:1px solid white;
+                border-right:1px solid white;
+                border-top-left-radius:12px;
+                border-bottom-left-radius:12px;
+                border-top-right-radius:12px;
+                border-bottom-right-radius:12px;
+                }
+            QLabel{
+                border:none;
+                color:black;
+                background:lightgreen;
+                border:1px solid #F3F3F5;
+                border-radius:10px;
+                font-size:12px;
+                height:40px;
+                padding-left:10px;
+                padding-right:10px;
+                text-align:center;
+                }
+            QPushButton{
+                border:none;
+                color:white;
+                background:gray;
+                border:1px solid #F3F3F5;
+                border-radius:10px;
+                font-size:20px;
+                height:40px;
+                padding-left:10px;
+                padding-right:10px;
+                text-align:center;
+                }
+            QPushButton:hover{
+                color:black;
+                border:1px solid #F3F3F5;
+                border-radius:10px;
+                background:LightGray;
+                }
+                '''
+        )
+        self.setAutoFillBackground(True)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog) #无边框
+        self.setAttribute(Qt.WA_TranslucentBackground) #透明度，去掉圆弧边角
         # layout
-        layout = QGridLayout(self)
-        self.setGeometry(300, 300, 250, 50)
+        self.label_frame = QFrame(self)
+        self.label_frame.resize(305, 75)
 
-        self.time_label = QLabel('123456',self)
-        self.time_label.resize(230, 40)
-        self.timer_btn = QPushButton('Start', self)
-
+        layout = QGridLayout(self.label_frame)
+        self.time_label = QLabel('Current:',self.label_frame)
+        self.time_label.resize(230, 20)
+        self.time_spend = QLabel('Spend  :',self.label_frame)
+        self.time_spend.resize(230, 20)
+        self.timer_btn = QPushButton('Start', self.label_frame)
+        self.timer_btn.setFixedSize(70, 25)
+        self.timer_close = QPushButton('Close', self.label_frame)
+        self.timer_close.setFixedSize(70, 25)
         self.timer_btn.clicked.connect(self.start_action)
+        self.timer_close.clicked.connect(self.closeW)
 
         layout.addWidget(self.time_label, 0 ,0)
         layout.addWidget(self.timer_btn, 0, 1)
+        layout.addWidget(self.time_spend, 1, 0)
+        layout.addWidget(self.timer_close, 1, 1)
 
         self.thread = UpdateTime()
         self.thread.time_show.connect(self.display_time)
         self.thread.start()
+
+    def closeW(self):
+        try:
+            self.logwnd.close()
+        except:
+            pass
+        self.close()
 
     def start_action(self):
         if self.timer_btn.text()=="Start":
@@ -67,20 +161,37 @@ class Main(QWidget):
             pass
         if self.timer_btn.text()== "Stop":
             self.timer_btn.setEnabled(False)
-            self.logwnd = LogWnd()  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
-            print(self.logwnd, 'begin')
+            self.logwnd = LogWnd(self.log_content)  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
             self.logwnd.show()
+            self.thread = UpdateSpend()
+            self.thread.time_spend.connect(self.display_spend)
+            self.thread.start()
 
     def display_time(self, msg):
-        self.time_label.setText(msg)
+        self.time_label.setText("Current:"+msg)
+
+    def display_spend(self, msg):
+        self.time_spend.setText('Spend  :'+msg)
+
+    def mouseMoveEvent(self, e: QMouseEvent):  # 重写移动事件
+        self._endPos = e.pos() - self._startPos
+        self.move(self.pos() + self._endPos)
+
+    def mousePressEvent(self, e: QMouseEvent):
+        if e.button() == Qt.LeftButton:
+            self._isTracking = True
+            self._startPos = QPoint(e.x(), e.y())
+
+    def mouseReleaseEvent(self, e: QMouseEvent):
+        if e.button() == Qt.LeftButton:
+            self._isTracking = False
+            self._startPos = None
+            self._endPos = None
+
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     x = Main()
     x.show()
-    # a = LogWnd()
-    # a.show()
     sys.exit(app.exec_())
-
-
