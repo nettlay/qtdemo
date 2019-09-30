@@ -58,10 +58,12 @@ class LogWnd(QWidget):
         self.close_btn.clicked.connect(self.close_event)
 
         # self.closeEvent()
-
-    def close_event(self):
+    def closeEvent(self, QCloseEvent):
         print('close')
         self.close_signal.emit('closed')
+        self.close_event()
+
+    def close_event(self):
         self.close()
 
 
@@ -167,14 +169,14 @@ class Main(QDialog):
     def start_action(self):
         if self.timer_btn.text() == "Start":
             self.timer_btn.setText('Stop')
-            self.end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.begin_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             self.thread = UpdateSpend()
             self.thread.time_spend.connect(self.display_spend)
             self.thread.start()
 
         elif self.timer_btn.text() == "Stop":
-            self.begin_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             self.timer_btn.setText('Start')
             self.timer_btn.setEnabled(False)
             self.logwnd = LogWnd(self.log_content)  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
@@ -189,8 +191,8 @@ class Main(QDialog):
     def update_close(self, msg):
         if msg == 'closed':
             self.timer_btn.setEnabled(True)
-            print(self.begin_time)
-            print(self.end_time)
+            print(self.begin_time, 'bengin')
+            print(self.end_time, 'end')
             print(self.time_spend.text())
 
     def display_time(self, msg):
