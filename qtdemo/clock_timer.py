@@ -22,11 +22,18 @@ class UpdateSpend(QThread):
         spend = 0
         while 1:
             spend += 1
-            d = int(spend/60/60/24)
-            h = int(spend/60/60)
-            m = int(spend/60)
-            s = spend%60
-            str1 = '{}天{}时{}分{}秒'.format(d, h, m, s)
+            d = int(spend / 60 / 60 / 24)
+            h = int(spend / 60 / 60)
+            m = int(spend / 60)
+            s = spend % 60
+            if d == 0 and h != 0:
+                str1 = '{}时{}分{}秒'.format(h, m, s)
+            elif d == 0 and h == 0 and m != 0:
+                str1 = '{}分{}秒'.format(m, s)
+            elif d == 0 and h == 0 and m == 0:
+                str1 = '{}秒'.format(s)
+            else:
+                str1 = '{}天{}时{}分{}秒'.format(d, h, m, s)
             self.time_spend.emit(str(str1))
             time.sleep(1)
 
@@ -51,8 +58,10 @@ class LogWnd(QWidget):
         self.close_btn.clicked.connect(self.close_event)
 
         # self.closeEvent()
+
     def close_event(self):
-        self.log_btn.setEnabled(True)
+        print('close')
+        self.close_signal.emit('closed')
         self.close()
 
 
@@ -121,16 +130,16 @@ class Main(QDialog):
                 '''
         )
         self.setAutoFillBackground(True)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog) #无边框
-        self.setAttribute(Qt.WA_TranslucentBackground) #透明度，去掉圆弧边角
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)  # 无边框
+        self.setAttribute(Qt.WA_TranslucentBackground)  # 透明度，去掉圆弧边角
         # layout
         self.label_frame = QFrame(self)
         self.label_frame.resize(305, 75)
 
         layout = QGridLayout(self.label_frame)
-        self.time_label = QLabel('Current:',self.label_frame)
+        self.time_label = QLabel('Current:', self.label_frame)
         self.time_label.resize(230, 20)
-        self.time_spend = QLabel('Spend  :',self.label_frame)
+        self.time_spend = QLabel('Spend  :', self.label_frame)
         self.time_spend.resize(230, 20)
         self.timer_btn = QPushButton('Start', self.label_frame)
         self.timer_btn.setFixedSize(70, 25)
@@ -139,7 +148,7 @@ class Main(QDialog):
         self.timer_btn.clicked.connect(self.start_action)
         self.timer_close.clicked.connect(self.closeW)
 
-        layout.addWidget(self.time_label, 0 ,0)
+        layout.addWidget(self.time_label, 0, 0)
         layout.addWidget(self.timer_btn, 0, 1)
         layout.addWidget(self.time_spend, 1, 0)
         layout.addWidget(self.timer_close, 1, 1)
@@ -156,22 +165,39 @@ class Main(QDialog):
         self.close()
 
     def start_action(self):
-        if self.timer_btn.text()=="Start":
+        if self.timer_btn.text() == "Start":
             self.timer_btn.setText('Stop')
-            pass
-        if self.timer_btn.text()== "Stop":
-            self.timer_btn.setEnabled(False)
-            self.logwnd = LogWnd(self.log_content)  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
-            self.logwnd.show()
+            self.end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
             self.thread = UpdateSpend()
             self.thread.time_spend.connect(self.display_spend)
             self.thread.start()
 
+        elif self.timer_btn.text() == "Stop":
+            self.begin_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.timer_btn.setText('Start')
+            self.timer_btn.setEnabled(False)
+            self.logwnd = LogWnd(self.log_content)  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
+            self.logwnd.close_signal.connect(self.update_close)
+            self.logwnd.show()
+            try:
+                self.thread.disconnect()
+                # print(self.end_time - self.begin_time)
+            except:
+                pass
+
+    def update_close(self, msg):
+        if msg == 'closed':
+            self.timer_btn.setEnabled(True)
+            print(self.begin_time)
+            print(self.end_time)
+            print(self.time_spend.text())
+
     def display_time(self, msg):
-        self.time_label.setText("Current:"+msg)
+        self.time_label.setText("Current:" + msg)
 
     def display_spend(self, msg):
-        self.time_spend.setText('Spend  :'+msg)
+        self.time_spend.setText('Spend  :' + msg)
 
     def mouseMoveEvent(self, e: QMouseEvent):  # 重写移动事件
         self._endPos = e.pos() - self._startPos
@@ -187,7 +213,6 @@ class Main(QDialog):
             self._isTracking = False
             self._startPos = None
             self._endPos = None
-
 
 
 if __name__ == '__main__':
