@@ -1,8 +1,13 @@
 import datetime
+import os
+import sys
+if hasattr(sys, 'frozen'):
+    os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import time, sys
+import openpyxl
 
 
 class UpdateTime(QThread):
@@ -27,44 +32,156 @@ class UpdateSpend(QThread):
             m = int(spend / 60)
             s = spend % 60
             if d == 0 and h != 0:
-                str1 = '{}时{}分{}秒'.format(h, m, s)
+                str1 = '{}H{}M{}S'.format(h, m, s)
             elif d == 0 and h == 0 and m != 0:
-                str1 = '{}分{}秒'.format(m, s)
+                str1 = '{}M{}S'.format(m, s)
             elif d == 0 and h == 0 and m == 0:
-                str1 = '{}秒'.format(s)
+                str1 = '{}S'.format(s)
             else:
-                str1 = '{}天{}时{}分{}秒'.format(d, h, m, s)
+                str1 = '{}D{}H{}M{}S'.format(d, h, m, s)
             self.time_spend.emit(str(str1))
             time.sleep(1)
 
 
-class LogWnd(QWidget):
+class LogWnd(QDialog):
     close_signal = pyqtSignal(str)
 
-    def __init__(self, content):
-        QWidget.__init__(self)
-        self.setFixedSize(440, 350)
-        self.setWindowTitle('记录工作内容')
+    _startPos = None
+    _endPos = None
+    _isTracking = False
 
+    def __init__(self, start_time, end_time, spend_time, content='', ):
+        QDialog.__init__(self)
+        self.start_time = start_time
+        self.end_time = end_time
+        self.spend_time = spend_time.split(':', 1)[1]
+        self.saved_text = ''
+        self.setFixedSize(440, 350)
+        self.setWindowTitle('Record work content')
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)  # 无边框
+        self.setStyleSheet(
+            '''
+            QTextEdit{
+                border:none;
+                color:black;
+                background-color:white
+                }
+            QDialog{
+                background-color:lightblue;
+                border-top:1px solid white;
+                border-bottom:1px solid white;
+                border-left:1px solid white;
+                border-right:1px solid white;
+                border-top-left-radius:12px;
+                border-bottom-left-radius:12px;
+                border-top-right-radius:12px;
+                border-bottom-right-radius:12px;
+                }
+            QLabel{
+                border:none;
+                color:blue;
+                background:lightblue;
+                font-size:16px;
+                text-align:center;
+                }
+            QPushButton{
+                border:none;
+                color:white;
+                background:gray;
+                border:1px solid #F3F3F5;
+                border-radius:10px;
+                font-size:20px;
+                height:40px;
+                padding-left:10px;
+                padding-right:10px;
+                text-align:center;
+                }
+            QPushButton:hover{
+                color:black;
+                border:1px solid #F3F3F5;
+                border-radius:10px;
+                background:LightGray;
+                }
+                '''
+        )
         self.log_field = QTextEdit(content, self)
-        self.log_field.setGeometry(20, 20, 300, 300)
+        self.log_field.setGeometry(2, 40, 436, 307)
 
         # layout
+        self.label = QLabel('Record work content', self)
+        self.label.move(5, 10)
         self.log_btn = QPushButton('Save', self)
-        self.log_btn.move(350, 300)
-        self.close_btn = QPushButton('Close', self)
-        self.close_btn.move(350, 270)
+        self.log_btn.setFixedSize(70,30)
+        self.log_btn.move(330, 5)
+        self.close_btn = QPushButton('X', self)
+        self.close_btn.setFixedSize(30,30)
+        self.close_btn.move(405, 5)
 
-        self.close_btn.clicked.connect(self.close_event)
+        self.log_btn.clicked.connect(self.save)
+        self.close_btn.clicked.connect(self.closeEvent)
 
         # self.closeEvent()
     def closeEvent(self, QCloseEvent):
-        print('close')
         self.close_signal.emit('closed')
         self.close_event()
 
     def close_event(self):
-        self.close()
+        if self.saved_text == self.log_field.toPlainText():
+            self.close()
+        else:
+            isSaved = QMessageBox.information(None, 'Warning', 'Logged content is not saved, do you want saved?', QMessageBox.Yes | QMessageBox.No,QMessageBox.Yes)
+            if isSaved == 16384:
+                self.save()
+                self.close()
+            elif isSaved == 65536:
+                self.saved_text = self.log_field.toPlainText()
+                self.close()
+
+    def save(self):
+        self.saved_text = self.log_field.toPlainText()
+        if os.path.exists('logwork.xlsx'):
+            wb = openpyxl.load_workbook('logwork.xlsx')
+            ws = wb.active
+            start_row = ws.max_row + 1
+            ws.cell(start_row, 1).value = self.start_time
+            ws.cell(start_row, 2).value = self.end_time
+            ws.cell(start_row, 3).value = self.spend_time
+            ws.cell(start_row, 4).value = 'None'
+            ws.cell(start_row, 5).value = self.saved_text
+            wb.save('logwork.xlsx')
+        else:
+            try:
+                workboot = openpyxl.Workbook()
+                ws = workboot.active
+                ws.cell(1, 1).value = 'Begin Time'
+                ws.cell(1, 2).value = 'End Time'
+                ws.cell(1, 3).value = 'Spend Time'
+                ws.cell(1, 4).value = 'Type'
+                ws.cell(1, 5).value = 'Work Log'
+                ws.cell(2, 1).value = self.start_time
+                ws.cell(2, 2).value = self.end_time
+                ws.cell(2, 3).value = self.spend_time
+                ws.cell(2, 4).value = 'None'
+                ws.cell(2, 5).value = self.saved_text
+                workboot.save('logwork.xlsx')
+            except:
+                import traceback
+                print(traceback.format_exc())
+
+    def mouseMoveEvent(self, e: QMouseEvent):  # 重写移动事件
+        self._endPos = e.pos() - self._startPos
+        self.move(self.pos() + self._endPos)
+
+    def mousePressEvent(self, e: QMouseEvent):
+        if e.button() == Qt.LeftButton:
+            self._isTracking = True
+            self._startPos = QPoint(e.x(), e.y())
+
+    def mouseReleaseEvent(self, e: QMouseEvent):
+        if e.button() == Qt.LeftButton:
+            self._isTracking = False
+            self._startPos = None
+            self._endPos = None
 
 
 class Main(QDialog):
@@ -74,7 +191,6 @@ class Main(QDialog):
 
     def __init__(self):
         QDialog.__init__(self)
-        self.log_content = 'hello'
         self.setWindowTitle('字体设置')
         self.setFixedSize(QSize(305, 80))
         # border-image:url(img.jpg);
@@ -179,21 +295,19 @@ class Main(QDialog):
             self.end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             self.timer_btn.setText('Start')
             self.timer_btn.setEnabled(False)
-            self.logwnd = LogWnd(self.log_content)  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
+            self.logwnd = LogWnd(start_time=self.begin_time, end_time=self.end_time, spend_time=self.time_spend.text())  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
+            print(self.time_spend.text())
             self.logwnd.close_signal.connect(self.update_close)
             self.logwnd.show()
             try:
                 self.thread.disconnect()
-                # print(self.end_time - self.begin_time)
             except:
                 pass
 
     def update_close(self, msg):
         if msg == 'closed':
             self.timer_btn.setEnabled(True)
-            print(self.begin_time, 'bengin')
-            print(self.end_time, 'end')
-            print(self.time_spend.text())
+            self.time_spend.setText('Spend  :')
 
     def display_time(self, msg):
         self.time_label.setText("Current:" + msg)
