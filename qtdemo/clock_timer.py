@@ -110,7 +110,7 @@ class LogWnd(QDialog):
         # layout
         self.label = QLabel('Record work content', self)
         self.label.move(5, 10)
-        self.log_btn = QPushButton('Save', self)
+        self.log_btn = QPushButton('&Save', self)
         self.log_btn.setFixedSize(70,30)
         self.log_btn.move(330, 5)
         self.close_btn = QPushButton('X', self)
@@ -122,7 +122,7 @@ class LogWnd(QDialog):
 
         # self.closeEvent()
     def closeEvent(self, QCloseEvent):
-        self.close_signal.emit('closed')
+        self.close_signal.emit('&closed')
         self.close_event()
 
     def close_event(self):
@@ -248,7 +248,7 @@ class Main(QDialog):
                 '''
         )
         self.setAutoFillBackground(True)
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)  # 无边框
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog | Qt.WindowStaysOnTopHint)  # 无边框 置顶
         self.setAttribute(Qt.WA_TranslucentBackground)  # 透明度，去掉圆弧边角
         # layout
         self.label_frame = QFrame(self)
@@ -260,8 +260,9 @@ class Main(QDialog):
         self.time_spend = QLabel('Spend  :', self.label_frame)
         self.time_spend.resize(230, 20)
         self.timer_btn = QPushButton('Start', self.label_frame)
+        self.timer_btn.setShortcut('shift+alt+1')
         self.timer_btn.setFixedSize(70, 25)
-        self.timer_close = QPushButton('Close', self.label_frame)
+        self.timer_close = QPushButton('&Close', self.label_frame)
         self.timer_close.setFixedSize(70, 25)
         self.timer_btn.clicked.connect(self.start_action)
         self.timer_close.clicked.connect(self.closeW)
@@ -285,6 +286,7 @@ class Main(QDialog):
     def start_action(self):
         if self.timer_btn.text() == "Start":
             self.timer_btn.setText('Stop')
+            self.timer_btn.setShortcut('shift+alt+1')
             self.begin_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             self.thread = UpdateSpend()
@@ -294,6 +296,7 @@ class Main(QDialog):
         elif self.timer_btn.text() == "Stop":
             self.end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             self.timer_btn.setText('Start')
+            self.timer_btn.setShortcut('shift+alt+1')
             self.timer_btn.setEnabled(False)
             self.logwnd = LogWnd(start_time=self.begin_time, end_time=self.end_time, spend_time=self.time_spend.text())  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
             print(self.time_spend.text())
