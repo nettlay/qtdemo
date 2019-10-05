@@ -148,7 +148,6 @@ class LogWnd(QDialog):
 
         self.set_status_btn = QPushButton('Set', self)
         self.set_status_btn.setFixedSize(70, 25)
-        self.set_status_btn.setShortcut('shift+alt+s')
         self.set_status_btn.move(335, 40)
         self.set_status_btn.clicked.connect(self.set_status)
 
@@ -156,6 +155,26 @@ class LogWnd(QDialog):
         self.close_btn.setShortcut('shift+alt+c')
         self.close_btn.setFixedSize(30, 30)
         self.close_btn.move(408, 2)
+        self.close_btn.setStyleSheet(
+            """
+            QPushButton{
+                border:none;
+                color:white;
+                background:lightblue;
+                font-size:15px;
+                height:40px;
+                padding-left:10px;
+                padding-right:10px;
+                text-align:center;
+                }
+            QPushButton:hover{
+                color:white;
+                border:1px solid #F3F3F5;
+                border-radius:10px;
+                background:red;
+                }
+            """
+        )
 
         self.log_btn.clicked.connect(self.save)
         self.close_btn.clicked.connect(self.closeEvent)
@@ -357,6 +376,7 @@ class Main(QDialog):
         self.timer_btn.setShortcut('shift+alt+1')
         self.timer_btn.setFixedSize(70, 25)
         self.timer_close = QPushButton('Close', self.label_frame)
+        self.timer_close.setShortcut('shift+alt+2')
         self.timer_close.setFixedSize(70, 25)
         self.timer_btn.clicked.connect(self.start_action)
         self.timer_close.clicked.connect(self.closeW)
@@ -408,7 +428,7 @@ class Main(QDialog):
     def update_close(self, msg):
         if msg == 'closed':
             self.timer_btn.setEnabled(True)
-            self.time_spend.setText('Spend  :0天0小时0分钟0秒')
+            self.time_spend.setText('Spend  :00:00:00')
 
     def display_time(self, msg):
         self.time_label.setText("Current:" + msg)
