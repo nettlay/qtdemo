@@ -1,6 +1,7 @@
 import datetime
 import os
 import sys
+
 if hasattr(sys, 'frozen'):
     os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
 from PyQt5.QtWidgets import *
@@ -27,18 +28,16 @@ class UpdateSpend(QThread):
         spend = 0
         while 1:
             spend += 1
-            d = int(spend / 60 / 60 / 24)
             h = int(spend / 60 / 60)
             m = int(spend / 60)
             s = spend % 60
-            if d == 0 and h != 0:
-                str1 = '{}H{}M{}S'.format(h, m, s)
-            elif d == 0 and h == 0 and m != 0:
-                str1 = '{}M{}S'.format(m, s)
-            elif d == 0 and h == 0 and m == 0:
-                str1 = '{}S'.format(s)
-            else:
-                str1 = '{}D{}H{}M{}S'.format(d, h, m, s)
+            if h < 10:
+                h = '0%d' % h
+            if m < 10:
+                m = '0%d' % m
+            if s < 10:
+                s = '0%d' % s
+            str1 = '{}:{}:{}'.format(h, m, s)
             self.time_spend.emit(str(str1))
             time.sleep(1)
 
@@ -52,12 +51,18 @@ class LogWnd(QDialog):
 
     def __init__(self, start_time, end_time, spend_time, content='', ):
         QDialog.__init__(self)
-        self.start_time = start_time
-        self.end_time = end_time
+        self.isSaved = False  # 判断在关闭窗口时是否需要提示保存对话框
+        self.start_time = start_time  # 父窗口传递过来的开始时间
+        self.end_time = end_time  # 父窗口传递过来的结束时间
         self.spend_time = spend_time.split(':', 1)[1]
         self.saved_text = ''
-        self.setFixedSize(440, 350)
-        self.setWindowTitle('Record work content')
+        self.selection = ''
+        # load work list from excel
+        self.process_list = []
+        self.wait_list = []
+        self.completed_list = []
+        self.list_storys()
+        # self.setFixedSize(440, 350)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)  # 无边框
         self.setStyleSheet(
             '''
@@ -77,6 +82,16 @@ class LogWnd(QDialog):
                 border-top-right-radius:12px;
                 border-bottom-right-radius:12px;
                 }
+            QComboBox{
+                color:black;
+                background:lightgreen;
+                font-size:16px;
+                text-align:center;
+                border-top-left-radius:12px;
+                border-bottom-left-radius:12px;
+                border-top-right-radius:12px;
+                border-bottom-right-radius:12px;
+                }
             QLabel{
                 border:none;
                 color:blue;
@@ -90,7 +105,7 @@ class LogWnd(QDialog):
                 background:gray;
                 border:1px solid #F3F3F5;
                 border-radius:10px;
-                font-size:20px;
+                font-size:15px;
                 height:40px;
                 padding-left:10px;
                 padding-right:10px;
@@ -104,32 +119,102 @@ class LogWnd(QDialog):
                 }
                 '''
         )
-        self.log_field = QTextEdit(content, self)
-        self.log_field.setGeometry(2, 40, 436, 307)
 
         # layout
-        self.label = QLabel('Record work content', self)
-        self.label.move(5, 10)
-        self.log_btn = QPushButton('&Save', self)
-        self.log_btn.setFixedSize(70,30)
-        self.log_btn.move(330, 5)
+        self.stoys = QComboBox(self)
+        self.stoys.move(5, 10)
+        self.stoys.resize(320, 25)
+        for item in self.process_list:
+            self.stoys.addItem(item)
+        for item in self.wait_list:
+            self.stoys.addItem(item)
+        for item in self.completed_list:
+            self.stoys.addItem(item)
+        self.stoys.currentIndexChanged.connect(self.selection_changed)
+
+        self.status = QComboBox(self)
+        self.status.move(5, 40)
+        self.status.resize(320, 25)
+        self.status.addItems(['', 'Processing', 'Waitting', 'Completed'])
+
+        self.log_field = QTextEdit(content, self)
+        self.log_field.setGeometry(2, 70, 436, 307)
+        self.log_field.setText(self.stoys.currentText())
+
+        self.log_btn = QPushButton('Save', self)
+        self.log_btn.setFixedSize(70, 25)
+        self.log_btn.setShortcut('shift+alt+s')
+        self.log_btn.move(335, 10)
+
+        self.set_status_btn = QPushButton('Set', self)
+        self.set_status_btn.setFixedSize(70, 25)
+        self.set_status_btn.setShortcut('shift+alt+s')
+        self.set_status_btn.move(335, 40)
+        self.set_status_btn.clicked.connect(self.set_status)
+
         self.close_btn = QPushButton('X', self)
-        self.close_btn.setFixedSize(30,30)
-        self.close_btn.move(405, 5)
+        self.close_btn.setShortcut('shift+alt+c')
+        self.close_btn.setFixedSize(30, 30)
+        self.close_btn.move(408, 2)
 
         self.log_btn.clicked.connect(self.save)
         self.close_btn.clicked.connect(self.closeEvent)
-
         # self.closeEvent()
+
+    def set_status(self):
+        project = self.stoys.currentText()
+        status = self.status.currentText()
+        wb = openpyxl.load_workbook('worklist.xlsx')
+        ws = wb.active
+        for row in range(2, ws.max_row + 1):
+            if project == ws.cell(row, 1).value:
+                ws.cell(row, 3).value = status
+                wb.save('worklist.xlsx')
+                break
+            else:
+                continue
+
+    def list_storys(self):
+        if not os.path.exists('worklist.xlsx'):
+            QMessageBox.information(None, 'Warning',
+                                    'No work list with name worklist.xlsx was found please double check and copy to {}'.format(
+                                        os.getcwd()), QMessageBox.Yes)
+            return
+        else:
+            wb = openpyxl.load_workbook('worklist.xlsx')
+            ws = wb.active
+            for row in range(2, ws.max_row + 1):
+                project_name = ws.cell(row, 1).value
+                project_status = ws.cell(row, 3).value
+                if project_status.upper() == 'PROCESSING':
+                    self.process_list.append(project_name)
+                elif project_status.upper() == 'WAITTING':
+                    self.wait_list.append(project_name)
+                elif project_status.upper() == 'COMPLETED':
+                    self.completed_list.append(project_name)
+
+    def selection_changed(self):
+        self.selection = self.stoys.currentText()
+        self.log_field.setText(self.selection)
+        if self.selection in self.process_list:
+            self.status.setCurrentText('Processing')
+        elif self.selection in self.wait_list:
+            self.status.setCurrentText('Waitting')
+        elif self.selection in self.completed_list:
+            self.status.setCurrentText('Completed')
+        else:
+            pass
+
     def closeEvent(self, QCloseEvent):
-        self.close_signal.emit('&closed')
+        self.close_signal.emit('closed')
         self.close_event()
 
     def close_event(self):
         if self.saved_text == self.log_field.toPlainText():
             self.close()
         else:
-            isSaved = QMessageBox.information(None, 'Warning', 'Logged content is not saved, do you want saved?', QMessageBox.Yes | QMessageBox.No,QMessageBox.Yes)
+            isSaved = QMessageBox.information(None, 'Warning', 'Logged content is not saved, do you want saved?',
+                                              QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
             if isSaved == 16384:
                 self.save()
                 self.close()
@@ -138,6 +223,9 @@ class LogWnd(QDialog):
                 self.close()
 
     def save(self):
+        if self.isSaved:
+            if self.saved_text == self.log_field.toPlainText():
+                return
         self.saved_text = self.log_field.toPlainText()
         if os.path.exists('logwork.xlsx'):
             wb = openpyxl.load_workbook('logwork.xlsx')
@@ -146,31 +234,32 @@ class LogWnd(QDialog):
             ws.cell(start_row, 1).value = self.start_time
             ws.cell(start_row, 2).value = self.end_time
             ws.cell(start_row, 3).value = self.spend_time
-            ws.cell(start_row, 4).value = 'None'
+            ws.cell(start_row, 4).value = self.selection
             ws.cell(start_row, 5).value = self.saved_text
             wb.save('logwork.xlsx')
+            self.isSaved = True
         else:
-            try:
-                workboot = openpyxl.Workbook()
-                ws = workboot.active
-                ws.cell(1, 1).value = 'Begin Time'
-                ws.cell(1, 2).value = 'End Time'
-                ws.cell(1, 3).value = 'Spend Time'
-                ws.cell(1, 4).value = 'Type'
-                ws.cell(1, 5).value = 'Work Log'
-                ws.cell(2, 1).value = self.start_time
-                ws.cell(2, 2).value = self.end_time
-                ws.cell(2, 3).value = self.spend_time
-                ws.cell(2, 4).value = 'None'
-                ws.cell(2, 5).value = self.saved_text
-                workboot.save('logwork.xlsx')
-            except:
-                import traceback
-                print(traceback.format_exc())
+            workboot = openpyxl.Workbook()
+            ws = workboot.active
+            ws.cell(1, 1).value = 'Begin Time'
+            ws.cell(1, 2).value = 'End Time'
+            ws.cell(1, 3).value = 'Spend Time'
+            ws.cell(1, 4).value = 'Type'
+            ws.cell(1, 5).value = 'Work Log'
+            ws.cell(2, 1).value = self.start_time
+            ws.cell(2, 2).value = self.end_time
+            ws.cell(2, 3).value = self.spend_time
+            ws.cell(2, 4).value = self.selection
+            ws.cell(2, 5).value = self.saved_text
+            workboot.save('logwork.xlsx')
+            self.isSaved = True
 
     def mouseMoveEvent(self, e: QMouseEvent):  # 重写移动事件
-        self._endPos = e.pos() - self._startPos
-        self.move(self.pos() + self._endPos)
+        try:
+            self._endPos = e.pos() - self._startPos
+            self.move(self.pos() + self._endPos)
+        except:
+            pass
 
     def mousePressEvent(self, e: QMouseEvent):
         if e.button() == Qt.LeftButton:
@@ -191,8 +280,13 @@ class Main(QDialog):
 
     def __init__(self):
         QDialog.__init__(self)
+        self.desktop = QApplication.desktop()
+        self.screen_rect = self.desktop.screenGeometry()
+        width, height = self.screen_rect.width(), self.screen_rect.height()
+
         self.setWindowTitle('字体设置')
         self.setFixedSize(QSize(305, 80))
+        self.move(width - 350, 10)
         # border-image:url(img.jpg);
         self.setStyleSheet(
             '''
@@ -233,7 +327,7 @@ class Main(QDialog):
                 background:gray;
                 border:1px solid #F3F3F5;
                 border-radius:10px;
-                font-size:20px;
+                font-size:15px;
                 height:40px;
                 padding-left:10px;
                 padding-right:10px;
@@ -257,12 +351,12 @@ class Main(QDialog):
         layout = QGridLayout(self.label_frame)
         self.time_label = QLabel('Current:', self.label_frame)
         self.time_label.resize(230, 20)
-        self.time_spend = QLabel('Spend  :', self.label_frame)
+        self.time_spend = QLabel('Spend  :00:00:00', self.label_frame)
         self.time_spend.resize(230, 20)
         self.timer_btn = QPushButton('Start', self.label_frame)
         self.timer_btn.setShortcut('shift+alt+1')
         self.timer_btn.setFixedSize(70, 25)
-        self.timer_close = QPushButton('&Close', self.label_frame)
+        self.timer_close = QPushButton('Close', self.label_frame)
         self.timer_close.setFixedSize(70, 25)
         self.timer_btn.clicked.connect(self.start_action)
         self.timer_close.clicked.connect(self.closeW)
@@ -284,6 +378,10 @@ class Main(QDialog):
         self.close()
 
     def start_action(self):
+        if not os.path.exists('worklist.xlsx'):
+            QMessageBox.information(None, 'Warning', 'No work list with name worklist.xlsx was found please double'
+                                                     ' check and copy to {}'.format(os.getcwd()), QMessageBox.Yes)
+            return
         if self.timer_btn.text() == "Start":
             self.timer_btn.setText('Stop')
             self.timer_btn.setShortcut('shift+alt+1')
@@ -298,8 +396,8 @@ class Main(QDialog):
             self.timer_btn.setText('Start')
             self.timer_btn.setShortcut('shift+alt+1')
             self.timer_btn.setEnabled(False)
-            self.logwnd = LogWnd(start_time=self.begin_time, end_time=self.end_time, spend_time=self.time_spend.text())  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
-            print(self.time_spend.text())
+            self.logwnd = LogWnd(start_time=self.begin_time, end_time=self.end_time,
+                                 spend_time=self.time_spend.text())  # 加了self之后打开子窗口会停留，否则子窗口会一闪而过
             self.logwnd.close_signal.connect(self.update_close)
             self.logwnd.show()
             try:
@@ -310,7 +408,7 @@ class Main(QDialog):
     def update_close(self, msg):
         if msg == 'closed':
             self.timer_btn.setEnabled(True)
-            self.time_spend.setText('Spend  :')
+            self.time_spend.setText('Spend  :0天0小时0分钟0秒')
 
     def display_time(self, msg):
         self.time_label.setText("Current:" + msg)
@@ -319,8 +417,12 @@ class Main(QDialog):
         self.time_spend.setText('Spend  :' + msg)
 
     def mouseMoveEvent(self, e: QMouseEvent):  # 重写移动事件
-        self._endPos = e.pos() - self._startPos
-        self.move(self.pos() + self._endPos)
+        try:
+            self._endPos = e.pos() - self._startPos
+            self.move(self.pos() + self._endPos)
+            e.accept()
+        except:
+            pass
 
     def mousePressEvent(self, e: QMouseEvent):
         if e.button() == Qt.LeftButton:
