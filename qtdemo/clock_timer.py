@@ -135,11 +135,11 @@ class LogWnd(QDialog):
         self.status = QComboBox(self)
         self.status.move(5, 40)
         self.status.resize(320, 25)
-        self.status.addItems(['', 'Processing', 'Waitting', 'Completed'])
+        self.status.addItems(['Processing', 'Waitting', 'Completed'])
 
         self.log_field = QTextEdit(content, self)
         self.log_field.setGeometry(2, 70, 436, 307)
-        self.log_field.setText(self.stoys.currentText())
+        self.log_field.setText(self.stoys.currentText()+'\n')
 
         self.log_btn = QPushButton('Save', self)
         self.log_btn.setFixedSize(70, 25)
@@ -214,7 +214,7 @@ class LogWnd(QDialog):
 
     def selection_changed(self):
         self.selection = self.stoys.currentText()
-        self.log_field.setText(self.selection)
+        self.log_field.setText(self.selection + '\n')
         if self.selection in self.process_list:
             self.status.setCurrentText('Processing')
         elif self.selection in self.wait_list:
@@ -254,7 +254,7 @@ class LogWnd(QDialog):
             ws.cell(start_row, 2).value = self.end_time
             ws.cell(start_row, 3).value = self.spend_time
             ws.cell(start_row, 4).value = self.selection
-            ws.cell(start_row, 5).value = self.saved_text
+            ws.cell(start_row, 5).value = self.saved_text.split('\n', 1)[1]
             wb.save('logwork.xlsx')
             self.isSaved = True
         else:
@@ -263,7 +263,7 @@ class LogWnd(QDialog):
             ws.cell(1, 1).value = 'Begin Time'
             ws.cell(1, 2).value = 'End Time'
             ws.cell(1, 3).value = 'Spend Time'
-            ws.cell(1, 4).value = 'Type'
+            ws.cell(1, 4).value = 'Project'
             ws.cell(1, 5).value = 'Work Log'
             ws.cell(2, 1).value = self.start_time
             ws.cell(2, 2).value = self.end_time
@@ -303,7 +303,7 @@ class Main(QDialog):
         self.screen_rect = self.desktop.screenGeometry()
         width, height = self.screen_rect.width(), self.screen_rect.height()
 
-        self.setWindowTitle('字体设置')
+        # self.setWindowTitle('字体设置')
         self.setFixedSize(QSize(305, 80))
         self.move(width - 350, 10)
         # border-image:url(img.jpg);
@@ -368,9 +368,9 @@ class Main(QDialog):
         self.label_frame.resize(305, 75)
 
         layout = QGridLayout(self.label_frame)
-        self.time_label = QLabel('Current:', self.label_frame)
+        self.time_label = QLabel('时间:', self.label_frame)
         self.time_label.resize(230, 20)
-        self.time_spend = QLabel('Spend  :00:00:00', self.label_frame)
+        self.time_spend = QLabel('计时:00:00:00', self.label_frame)
         self.time_spend.resize(230, 20)
         self.timer_btn = QPushButton('Start', self.label_frame)
         self.timer_btn.setShortcut('shift+alt+1')
@@ -428,13 +428,13 @@ class Main(QDialog):
     def update_close(self, msg):
         if msg == 'closed':
             self.timer_btn.setEnabled(True)
-            self.time_spend.setText('Spend  :00:00:00')
+            self.time_spend.setText('计时:00:00:00')
 
     def display_time(self, msg):
-        self.time_label.setText("Current:" + msg)
+        self.time_label.setText("时间:" + msg)
 
     def display_spend(self, msg):
-        self.time_spend.setText('Spend  :' + msg)
+        self.time_spend.setText('计时:' + msg)
 
     def mouseMoveEvent(self, e: QMouseEvent):  # 重写移动事件
         try:
