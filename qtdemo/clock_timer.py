@@ -200,17 +200,22 @@ class LogWnd(QDialog):
                                         os.getcwd()), QMessageBox.Yes)
             return
         else:
-            wb = openpyxl.load_workbook('worklist.xlsx')
-            ws = wb.active
-            for row in range(2, ws.max_row + 1):
-                project_name = ws.cell(row, 1).value
-                project_status = ws.cell(row, 3).value
-                if project_status.upper() == 'PROCESSING':
-                    self.process_list.append(project_name)
-                elif project_status.upper() == 'WAITTING':
-                    self.wait_list.append(project_name)
-                elif project_status.upper() == 'COMPLETED':
-                    self.completed_list.append(project_name)
+            try:
+                wb = openpyxl.load_workbook('worklist.xlsx')
+                ws = wb.active
+                for row in range(2, ws.max_row + 1):
+                    project_name = ws.cell(row, 1).value
+                    project_status = ws.cell(row, 3).value
+                    if project_name is None:
+                        continue
+                    if project_status.upper() == 'PROCESSING':
+                        self.process_list.append(project_name)
+                    elif project_status.upper() == 'WAITTING':
+                        self.wait_list.append(project_name)
+                    elif project_status.upper() == 'COMPLETED':
+                        self.completed_list.append(project_name)
+            except Exception as e:
+                print(e)
 
     def selection_changed(self):
         self.selection = self.stoys.currentText()
