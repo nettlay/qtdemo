@@ -1,14 +1,14 @@
 import datetime
 import os
 import sys
-
+from openpyxl.styles import numbers
+import openpyxl
 if hasattr(sys, 'frozen'):
     os.environ['PATH'] = sys._MEIPASS + ";" + os.environ['PATH']
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import time, sys
-import openpyxl
 
 
 class UpdateTime(QThread):
@@ -257,6 +257,7 @@ class LogWnd(QDialog):
             start_row = ws.max_row + 1
             ws.cell(start_row, 1).value = self.start_time
             ws.cell(start_row, 2).value = self.end_time
+            ws.cell(start_row, 3).number_format = numbers.FORMAT_TEXT
             ws.cell(start_row, 3).value = self.spend_time
             ws.cell(start_row, 4).value = self.selection
             ws.cell(start_row, 5).value = self.saved_text.split('\n', 1)[1]
@@ -272,6 +273,7 @@ class LogWnd(QDialog):
             ws.cell(1, 5).value = 'Work Log'
             ws.cell(2, 1).value = self.start_time
             ws.cell(2, 2).value = self.end_time
+            ws.cell(2, 3).number_format = numbers.FORMAT_TEXT
             ws.cell(2, 3).value = self.spend_time
             ws.cell(2, 4).value = self.selection
             ws.cell(2, 5).value = self.saved_text
