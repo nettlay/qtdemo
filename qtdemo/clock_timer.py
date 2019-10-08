@@ -29,7 +29,7 @@ class UpdateSpend(QThread):
         while 1:
             spend += 1
             h = int(spend / 60 / 60)
-            m = int(spend / 60)
+            m = int(spend / 60 % 60)
             s = spend % 60
             if h < 10:
                 h = '0%d' % h
