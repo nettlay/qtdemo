@@ -16,7 +16,7 @@ class UpdateTime(QThread):
 
     def run(self):
         while 1:
-            a = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            a = datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S')
             self.time_show.emit(str(a))
             time.sleep(1)
 
@@ -410,14 +410,14 @@ class Main(QDialog):
         if self.timer_btn.text() == "Start":
             self.timer_btn.setText('Stop')
             self.timer_btn.setShortcut('shift+alt+1')
-            self.begin_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.begin_time = datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S')
 
             self.thread = UpdateSpend()
             self.thread.time_spend.connect(self.display_spend)
             self.thread.start()
 
         elif self.timer_btn.text() == "Stop":
-            self.end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.end_time = datetime.datetime.now().strftime('%m/%d/%Y %H:%M:%S')
             self.timer_btn.setText('Start')
             self.timer_btn.setShortcut('shift+alt+1')
             self.timer_btn.setEnabled(False)
